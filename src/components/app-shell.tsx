@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { BarChart3, LayoutDashboard, ListPlus, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
+import { BrandLogo } from "@/components/brand-logo";
 import { RedirectToSignIn, UserButton } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
@@ -38,12 +39,10 @@ export function AppShell({
   return (
     <div className="min-h-dvh bg-bg pb-24 md:pb-8">
       <header className="sticky top-0 z-20 border-b border-border/80 bg-bg/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
-          <div className="flex items-baseline gap-3">
-            <Link to="/" className="font-display text-xl font-medium tracking-tight text-fg">
-              所持金
-            </Link>
-            <span className="hidden text-sm text-muted sm:inline">{title}</span>
+        <div className="mx-auto flex h-[4.25rem] max-w-5xl items-center justify-between px-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <BrandLogo />
+            <span className="hidden text-sm text-muted md:inline">{title}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden max-w-40 truncate text-sm text-muted sm:inline">

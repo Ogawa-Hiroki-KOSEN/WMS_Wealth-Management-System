@@ -12,7 +12,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { createServerFn } from "@tanstack/react-start";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "所持金";
+const APP_NAME = "WMS 資産管理システム";
 
 const fetchSessionUser = createServerFn({ method: "GET" }).handler(async () => {
   const { getSessionUser } = await import("@/lib/auth/verify.server");

@@ -1,4 +1,5 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { BrandLogo } from "@/components/brand-logo";
 import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
@@ -18,11 +19,8 @@ function Login() {
   return (
     <main className="grid min-h-dvh place-items-center px-6 py-10">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-soft">
-        <p className="font-display text-sm tracking-wide text-muted">Mochikin</p>
-        <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-fg">
-          所持金
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted">
+        <BrandLogo size="hero" linked={false} />
+        <p className="mt-4 text-sm leading-relaxed text-muted">
           現金と口座の残高、日々の収支、月次レポートをひとつの場所で。
         </p>
         <div className="mt-8 space-y-2">

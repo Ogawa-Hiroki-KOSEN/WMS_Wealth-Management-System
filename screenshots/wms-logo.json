@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "WMS 資産管理システム",
+      "hasCanvas": false,
+      "bodyTextLen": 57,
+      "bodyTextHash": "b9153f8f3d3f3aea5576b40db3c2ca8fb838052f11fa54d69166b2a9a15c0885",
+      "bodyTextPrefix": "資産管理システム 現金と口座の残高、日々の収支、月次レポートをひとつの場所で。 Google で続けるX で続ける",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/wms-logo.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "WMS 資産管理システム",
+      "hasCanvas": false,
+      "bodyTextLen": 57,
+      "bodyTextHash": "b9153f8f3d3f3aea5576b40db3c2ca8fb838052f11fa54d69166b2a9a15c0885",
+      "bodyTextPrefix": "資産管理システム 現金と口座の残高、日々の収支、月次レポートをひとつの場所で。 Google で続けるX で続ける",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/wms-logo-mobile.png"
+    }
+  },
+  "brandWarnings": [
+    "BRAND NOTE: no custom public/og.jpg — the platform will serve the og.grok.me placeholder. Custom cards are the default for games of every kind (DOM board/word games included), whimsical apps, creative tools, and brand-forward pages — only plain utilities (converters, CRUD trackers, admin dashboards) keep the placeholder. If this app is not a plain utility, finish the brand-asset pass per /workspace/.grok/skills/og/SKILL.md."
+  ],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/wms-logo.json"
+}
