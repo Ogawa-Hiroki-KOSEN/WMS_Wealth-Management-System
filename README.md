@@ -176,6 +176,254 @@ npm run build
 
 ---
 
+## Windows サーバーで動かす
+
+このアプリは Node.js の Web サーバーです。IIS 単体では動きません。Windows 上で **Node を常駐**し、公開は **HTTPS のリバースプロキシ**（IIS / Caddy など）経由にします。
+
+Google / X ログインは Grok の認証ブローカー前提です。**自分のドメインだけでは通常動きません。** 自前サーバーでは PostgreSQL を必須にし、ログインはメール方式の改修が必要です（後述）。
+
+### 1. 前提ソフト
+
+| ソフト | 目安 | メモ |
+| --- | --- | --- |
+| Node.js | **22 LTS** | https://nodejs.org （「Add to PATH」をオン） |
+| PostgreSQL | 16 前後 | https://www.postgresql.org/download/windows/ |
+| Git | 任意 | ソースの受け渡し用 |
+
+インストール後、**新しい** PowerShell で確認します。
+
+```powershell
+node -v    # v22.x
+npm -v
+psql --version
+```
+
+### 2. ソースを置く
+
+例: `C:\apps\wms`
+
+ZIP を展開するか、このリポジトリ一式をコピーします。`node_modules` はコピーせず、サーバーで入れ直してください。
+
+```powershell
+cd C:\apps\wms
+npm install
+```
+
+### 3. PostgreSQL を用意する
+
+インストール時に superuser（多くは `postgres`）のパスワードを決めています。PowerShell から（パスワードを聞かれたら入力）:
+
+```powershell
+# パスはインストール先に合わせて変更
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres
+```
+
+```sql
+CREATE USER wms WITH PASSWORD 'ここを強いパスワードに';
+CREATE DATABASE wms OWNER wms ENCODING 'UTF8';
+GRANT ALL PRIVILEGES ON DATABASE wms TO wms;
+```
+
+`\q` で抜けます。接続文字列は次の形です（パスワードに `@` や `#` があるときは URL エンコード）。
+
+```
+postgresql://wms:パスワード@127.0.0.1:5432/wms
+```
+
+ファイアウォールで Postgres の **5432 をインターネットに開けない**でください。アプリと同じマシンなら localhost だけです。
+
+### 4. 環境変数（必須）
+
+このリポジトリには `.env` を置きません。**Windows のシステム環境変数**か、起動スクリプトで渡します。
+
+| 変数 | 必須 | 内容 |
+| --- | --- | --- |
+| `DATABASE_URL` | 必須 | 上の接続文字列。無いと埋め込み DB になり、**再起動でデータが消える** |
+| `BETTER_AUTH_URL` | 必須 | ブラウザが開く公開 URL。例 `https://wms.example.com`。末尾スラッシュなし |
+| `BETTER_AUTH_SECRET` | 必須 | セッション署名。32 文字以上の乱数。一度決めたら変えない（変えると全員ログアウト） |
+| `VITE_AUTH_ENABLED` | 推奨 | `true`。ビルド時に埋め込まれる |
+
+乱数の作り方:
+
+```powershell
+[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+システムの環境変数に入れる例（管理者 PowerShell）:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("DATABASE_URL", "postgresql://wms:パスワード@127.0.0.1:5432/wms", "Machine")
+[System.Environment]::SetEnvironmentVariable("BETTER_AUTH_URL", "https://wms.example.com", "Machine")
+[System.Environment]::SetEnvironmentVariable("BETTER_AUTH_SECRET", "上で作った乱数", "Machine")
+[System.Environment]::SetEnvironmentVariable("VITE_AUTH_ENABLED", "true", "Machine")
+```
+
+設定後は PowerShell を開き直します。`echo $env:DATABASE_URL` で入っているか確認。
+
+**HTTPS が必須です。** セッション Cookie 名が `__Host-` 付きのため、`http://` や IP 直打ちではログインが維持できません。社内だけなら IIS に証明書、または [Caddy](https://caddyserver.com/) の自動 HTTPS、検証だけなら mkcert の私有 CA を使います。
+
+`BETTER_AUTH_URL` と、実際にブラウザのアドレスバーに出る origin を一致させてください。`https://wms.example.com` で公開しているのに `http://192.168.1.10:8080` で開くと「Invalid origin」になります。
+
+### 5. 初回ビルドとマイグレーション
+
+環境変数が入った状態で:
+
+```powershell
+cd C:\apps\wms
+npm run build
+```
+
+成功すると本番向け成果物ができ、`DATABASE_URL` 先へ `migrations/*.sql` が当たります（認証テーブル＋口座・明細）。失敗したら Postgres が起動しているか、接続文字列とユーザー権限を見てください。
+
+### 6. 起動確認
+
+開発用（データは Postgres に載る）:
+
+```powershell
+npm run dev
+```
+
+本番相当（このリポジトリのビルド済み配信）:
+
+```powershell
+npm run preview
+```
+
+`preview` は **127.0.0.1:8081** で待ち受けます。インターネットには出さず、IIS / Caddy からだけ転送します。
+
+起動ログにエラーが無く、同じマシンで `http://127.0.0.1:8081` が開けば Node 側は生きています。ログインの確認は、次の HTTPS 経由で行ってください。
+
+### 7. 常駐（再起動後も動かす）
+
+PowerShell を閉じると Node は止まります。NSSM などでサービス化します。
+
+`C:\apps\wms\start-prod.cmd` を作る例:
+
+```bat
+@echo off
+cd /d C:\apps\wms
+call "C:\Program Files\nodejs\npm.cmd" run preview
+```
+
+[NSSM](https://nssm.cc) （管理者）:
+
+```text
+nssm install WMS C:\apps\wms\start-prod.cmd
+nssm set WMS AppDirectory C:\apps\wms
+nssm set WMS Start SERVICE_AUTO_START
+nssm start WMS
+```
+
+環境変数をシステムに入れておけば、サービスにも継承されます。入れていなければ `nssm set WMS AppEnvironmentExtra` で `DATABASE_URL=...` などを渡します。
+
+### 8. IIS で HTTPS 公開する（推奨構成）
+
+```
+ブラウザ --HTTPS:443--> IIS --HTTP--> 127.0.0.1:8081 (Node)
+```
+
+1. IIS と「URL 書き換え」、Application Request Routing (ARR) を入れる
+2. サイトを追加し、ホスト名 `wms.example.com`、証明書を 443 にバインド
+3. サーバーノード → Application Request Routing → Server Proxy Settings → **Enable proxy**
+4. URL Rewrite の Allowed Server Variables に `HTTP_X_FORWARDED_PROTO` と `HTTP_X_FORWARDED_HOST` を追加
+5. サイトの `web.config`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="WMS" stopProcessing="true">
+          <match url="(.*)" />
+          <action type="Rewrite" url="http://127.0.0.1:8081/{R:1}" />
+          <serverVariables>
+            <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+            <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+          </serverVariables>
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>
+```
+
+Caddy の方が短い例:
+
+```
+wms.example.com {
+  reverse_proxy 127.0.0.1:8081
+}
+```
+
+5432 と 8081 はファイアウォールで外部に開けないでください。開けるのは 443 だけです。
+
+### 9. 認証について（自前ホストでつまずく点）
+
+- **Google / X** は `auth.grok.me` 経由です。Grok 上にデプロイしたとき用で、独自ドメインのコールバックはブローカー側に登録されていません。Windows サーバーだけで完結させるなら使えません。
+- 自前でログインするなら:
+  1. `src/lib/auth/email-password.ts` の `emailAndPasswordEnabled` を `true`
+  2. ログイン画面にメール＋パスワードの登録 / サインイン UI を足す（**現状は Google / X ボタンのみ**）
+  3. `npm run build` し直す
+- 社内の少人数で、VPN の内側に置く運用が現実的です。
+
+### 10. 更新手順
+
+```powershell
+nssm stop WMS
+cd C:\apps\wms
+# ソースを入れ替え（口座データは Postgres 側。node_modules は残してよい）
+npm install
+npm run build
+nssm start WMS
+```
+
+適用済みの `migrations/0001_*.sql` や `0002_*.sql` は編集しない。変更は新しい番号の SQL を足す。
+
+### 11. バックアップ（財務データ）
+
+中身は全部 Postgres です。アプリフォルダをコピーしても明細は残りません。
+
+```powershell
+$stamp = Get-Date -Format "yyyyMMdd-HHmm"
+New-Item -ItemType Directory -Force -Path C:\backup | Out-Null
+$out = "C:\backup\wms-$stamp.dump"
+& "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -U wms -Fc -f $out wms
+```
+
+復元:
+
+```powershell
+& "C:\Program Files\PostgreSQL\16\bin\pg_restore.exe" -U wms -d wms --clean C:\backup\wms-YYYYMMDD.dump
+```
+
+タスクスケジューラで毎日 `pg_dump` を回し、保存先は別ディスクか NAS にしてください。
+
+### 12. 運用チェックリスト
+
+- [ ] Node 22 と Postgres が OS 起動時に自動起動
+- [ ] `DATABASE_URL` が入っており、再起動後も口座が残る
+- [ ] 公開 URL が HTTPS で、`BETTER_AUTH_URL` と一致
+- [ ] 5432 と 8081 をインターネットに公開していない
+- [ ] `BETTER_AUTH_SECRET` をリポジトリやチャットに貼っていない
+- [ ] `pg_dump` が定期実行されている
+- [ ] Windows Update 後に Node サービスが起きているか確認
+
+### うまくいかないとき
+
+| 症状 | 見ること |
+| --- | --- |
+| ビルドは成功するが真っ白 | リバースプロキシが `/assets` を HTML に落としている。静的ファイルも Node へ全部転送 |
+| ログインできない / すぐログアウト | HTTP で開いている。`__Host-` Cookie は HTTPS 必須 |
+| Invalid origin | `BETTER_AUTH_URL` と実際の origin が違う。www の有無、http/https |
+| 再起動でデータ消失 | `DATABASE_URL` 未設定で埋め込み DB になっている |
+| マイグレーション失敗 | Postgres 未起動、パスワード、DB 名、ユーザー権限 |
+| ポート使用中 | 別プロセスが 8081 を掴んでいる。`netstat -ano | findstr 8081` |
+
+社内サーバーでメールログイン画面まで欲しければ、その改修を先に入れるのが安全です。
+
+---
+
 ## 技術構成
 
 | 層 | 採用 |
