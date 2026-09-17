@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
+  --font-sans: "IBM Plex Sans", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+
+  --color-bg: #f3efe6;
+  --color-surface: #fbf8f1;
+  --color-elevated: #ffffff;
+  --color-fg: #1b1916;
+  --color-muted: #6d675e;
+  --color-subtle: #8f877c;
+  --color-border: #e4ddd0;
+  --color-primary: #2c463f;
+  --color-primary-fg: #f7f4ec;
+  --color-ink: #1b1916;
+  --color-income: #2f6b57;
+  --color-expense: #a24a3a;
+  --color-transfer: #4a5c78;
+  --color-ring: #2c463f;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --shadow-soft: 0 12px 32px -18px rgb(27 25 22 / 0.28);
+}
+
+@layer base {
+  html {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
+
+  body {
+    min-height: 100dvh;
+    background:
+      radial-gradient(1200px 480px at 10% -10%, rgb(44 70 63 / 0.07), transparent 55%),
+      var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
