@@ -1,0 +1,9 @@
+{
+  "databaseUrl": "postgresql://wms:パスワード@127.0.0.1:5432/wms",
+  "betterAuthUrl": "https://自分.mydns.jp",
+  "betterAuthSecret": "32文字以上の乱数",
+  "authEnabled": true,
+  "googleOAuth": true,
+  "googleClientId": "xxxxx.apps.googleusercontent.com",
+  "googleClientSecret": "GOCSPX-..."
+}

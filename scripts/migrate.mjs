@@ -17,6 +17,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
 import { pendingMigrations } from "./migration-plan.mjs";
+import { applyServerConfigToEnv, readServerConfig } from "./load-server-config.mjs";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+applyServerConfigToEnv(readServerConfig(root), process.env);
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

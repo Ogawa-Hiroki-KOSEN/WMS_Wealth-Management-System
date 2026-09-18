@@ -180,7 +180,7 @@ npm run build
 
 このアプリは Node.js の Web サーバーです。IIS 単体では動きません。Windows 上で **Node を常駐**し、公開は **HTTPS のリバースプロキシ**（IIS / Caddy など）経由にします。
 
-Google / X ログインは Grok の認証ブローカー前提です。**自分のドメインだけでは通常動きません。** 自前サーバーでは PostgreSQL を必須にし、ログインはメール方式の改修が必要です（後述）。
+Google / X ログインは、Grok 上ではブローカー経由で動きます。自宅ドメインで Google を使う手順は「自宅 PC + MyDNS」と「自前ドメインで Google 認証」にあります。
 
 ### 1. 前提ソフト
 
@@ -232,41 +232,53 @@ postgresql://wms:パスワード@127.0.0.1:5432/wms
 
 ファイアウォールで Postgres の **5432 をインターネットに開けない**でください。アプリと同じマシンなら localhost だけです。
 
-### 4. 環境変数（必須）
+### 4. 設定は `config/server.json` にまとめる
 
-このリポジトリには `.env` を置きません。**Windows のシステム環境変数**か、起動スクリプトで渡します。
+機密（DB パスワード、Google シークレット、セッション鍵）は **このファイルに書いてよい**です。サーバーだけが読み、ブラウザの JS には入りません。Git に上げない（`.gitignore` 済み）。雛形は `config/server.example.json`。
 
-| 変数 | 必須 | 内容 |
-| --- | --- | --- |
-| `DATABASE_URL` | 必須 | 上の接続文字列。無いと埋め込み DB になり、**再起動でデータが消える** |
-| `BETTER_AUTH_URL` | 必須 | ブラウザが開く公開 URL。例 `https://wms.example.com`。末尾スラッシュなし |
-| `BETTER_AUTH_SECRET` | 必須 | セッション署名。32 文字以上の乱数。一度決めたら変えない（変えると全員ログアウト） |
-| `VITE_AUTH_ENABLED` | 推奨 | `true`。ビルド時に埋め込まれる |
+```json
+{
+  "databaseUrl": "postgresql://wms:パスワード@127.0.0.1:5432/wms",
+  "betterAuthUrl": "https://自分.mydns.jp",
+  "betterAuthSecret": "32文字以上の乱数",
+  "authEnabled": true,
+  "googleOAuth": true,
+  "googleClientId": "xxxxx.apps.googleusercontent.com",
+  "googleClientSecret": "GOCSPX-..."
+}
+```
 
-乱数の作り方:
+| キー | 内容 |
+| --- | --- |
+| `databaseUrl` | Postgres。空だと埋め込み DB（再起動で消える） |
+| `betterAuthUrl` | ブラウザの公開 URL。HTTPS。末尾スラッシュなし |
+| `betterAuthSecret` | セッション署名。一度決めたら変えない |
+| `authEnabled` | 任意。`false` で認証オフ。省略時は変えない |
+| `googleOAuth` | 任意。`true` で Google Cloud 直結（**ビルドし直す**） |
+| `googleClientId` / `googleClientSecret` | Google Cloud の値 |
+
+ファイルに書いた **非空の値は OS の環境変数より優先**されます。空文字は「未設定」で、そのときだけ環境変数を使います（Grok 上のデプロイ注入用）。
+
+乱数:
 
 ```powershell
 [Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
 ```
 
-システムの環境変数に入れる例（管理者 PowerShell）:
+コピー:
 
 ```powershell
-[System.Environment]::SetEnvironmentVariable("DATABASE_URL", "postgresql://wms:パスワード@127.0.0.1:5432/wms", "Machine")
-[System.Environment]::SetEnvironmentVariable("BETTER_AUTH_URL", "https://wms.example.com", "Machine")
-[System.Environment]::SetEnvironmentVariable("BETTER_AUTH_SECRET", "上で作った乱数", "Machine")
-[System.Environment]::SetEnvironmentVariable("VITE_AUTH_ENABLED", "true", "Machine")
+copy C:\apps\wms\config\server.example.json C:\apps\wms\config\server.json
+notepad C:\apps\wms\config\server.json
 ```
 
-設定後は PowerShell を開き直します。`echo $env:DATABASE_URL` で入っているか確認。
+変えたら `npm run build`（特に `googleOAuth`）と Node 再起動。
 
-**HTTPS が必須です。** セッション Cookie 名が `__Host-` 付きのため、`http://` や IP 直打ちではログインが維持できません。社内だけなら IIS に証明書、または [Caddy](https://caddyserver.com/) の自動 HTTPS、検証だけなら mkcert の私有 CA を使います。
-
-`BETTER_AUTH_URL` と、実際にブラウザのアドレスバーに出る origin を一致させてください。`https://wms.example.com` で公開しているのに `http://192.168.1.10:8080` で開くと「Invalid origin」になります。
+**HTTPS が必須です。** Cookie が `__Host-` のため、`http://` や IP 直打ちではログインが維持できません。`betterAuthUrl` とアドレスバーを一致させてください。
 
 ### 5. 初回ビルドとマイグレーション
 
-環境変数が入った状態で:
+`config/server.json` を書いた状態で:
 
 ```powershell
 cd C:\apps\wms
@@ -314,7 +326,7 @@ nssm set WMS Start SERVICE_AUTO_START
 nssm start WMS
 ```
 
-環境変数をシステムに入れておけば、サービスにも継承されます。入れていなければ `nssm set WMS AppEnvironmentExtra` で `DATABASE_URL=...` などを渡します。
+環境変数をシステムに入れておけば、サービスにも継承されます。通常は `config/server.json` だけで足ります。
 
 ### 8. IIS で HTTPS 公開する（推奨構成）
 
@@ -360,12 +372,9 @@ wms.example.com {
 
 ### 9. 認証について（自前ホストでつまずく点）
 
-- **Google / X** は `auth.grok.me` 経由です。Grok 上にデプロイしたとき用で、独自ドメインのコールバックはブローカー側に登録されていません。Windows サーバーだけで完結させるなら使えません。
-- 自前でログインするなら:
-  1. `src/lib/auth/email-password.ts` の `emailAndPasswordEnabled` を `true`
-  2. ログイン画面にメール＋パスワードの登録 / サインイン UI を足す（**現状は Google / X ボタンのみ**）
-  3. `npm run build` し直す
-- 社内の少人数で、VPN の内側に置く運用が現実的です。
+このアプリのログインボタンは、Grok の認証ブローカー（`auth.grok.me`）経由で Google / X に飛ばします。**Grok 上にデプロイしたとき用**で、自宅サーバーの独自ドメインにはコールバックが登録されていません。
+
+自宅 PC ＋ MyDNS で公開し、**Google クラウドの OAuth を自分のドメインに直結する**手順は、下の「自宅PC + MyDNS」と「自前ドメインで Google 認証」を見てください。メール＋パスワードだけなら `src/lib/auth/email-password.ts` を `true` にしてログイン画面にフォームを足します（現状その UI はありません）。
 
 ### 10. 更新手順
 
@@ -424,6 +433,217 @@ $out = "C:\backup\wms-$stamp.dump"
 
 ---
 
+## 自宅 PC + MyDNS で公開する
+
+光回線の自宅 Windows PC をサーバーにし、[MyDNS.jp](https://www.mydns.jp/) で名前を付けて外から HTTPS で開く手順です。固定 IP は不要です（グローバル IP が時々変わる前提）。
+
+全体の流れ:
+
+```
+スマホ / PC
+  → https://自分.mydns.jp （または独自ドメイン）
+  → 自宅ルータ（ポート 443）
+  → この Windows（IIS または Caddy）
+  → 127.0.0.1:8081 の Node（WMS）
+```
+
+財務アプリなので、可能なら VPN の内側だけにするか、Google のテストユーザーを自分の Gmail だけに限定してください。
+
+### A. 先に確認すること（ここで詰む人が多い）
+
+1. **グローバル IPv4 があるか**  
+   ブラウザで [https://ifconfig.me](https://ifconfig.me) を開き、その数字がルータの WAN IP と同じなら、外から 443 を開けます。  
+   違う、または `100.64.x.x` 〜 `100.127.x.x` なら **CGNAT** です。IPv4 では自宅に届きません。IPv6（MyDNS の AAAA）か、Cloudflare Tunnel など別手段に切り替えます。
+2. **ISP が 80 / 443 を塞いでいないか**  
+   一部の回線は着信を禁止しています。塞がれていると証明書発行も HTTPS 公開もできません。
+3. **PC のスリープを切る**  
+   コントロールパネル → 電源 → スリープしない。NAS より落ちやすいので注意。
+4. **自宅のグローバル IP をチャットや Git に貼らない**
+
+### B. MyDNS.jp の登録
+
+1. [https://www.mydns.jp/](https://www.mydns.jp/) でアカウント作成（Master ID が発行される）
+2. ログイン → ドメイン情報の登録
+3. ホスト名を決める  
+   - 簡単: `なにか.mydns.jp`（MyDNS がくれるサブドメイン）  
+   - 独自ドメイン: お名前.com 等で買ったドメインの **NS を MyDNS のネームサーバーにする**か、`wms.example.com` の CNAME を `なにか.mydns.jp` に向ける
+4. IPv4 / IPv6 の通知を有効にする（最初は今の IP が空でも、次の更新で入る）
+
+独自ドメインを NS 委譲する場合、レジストラのネームサーバーを MyDNS の案内どおりにします（サイト内の「ネームサーバー」表記を正とする）。浸透に数時間かかることがあります。
+
+### C. グローバル IP が変わったら MyDNS に知らせる
+
+MyDNS は「今の自宅 IP はこれ」と定期的に教えないと、名前が古い IP のままになります。
+
+**いちばん簡単: ルータのダイナミック DNS**  
+バッファロー・NEC などは「MyDNS」項目があることが多いです。Master ID とパスワードを入れて IPv4 更新をオン。ルータが代わりに通知します。
+
+**公式の HTTP 更新**（タスクスケジューラで 10 分ごと。短すぎる連打は規約違反になり得ます）:
+
+```powershell
+# パスワードはスクリプトに直書きせず、環境変数や資格情報マネージャ推奨
+$pair = "マスターID:パスワード"
+$b64  = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
+Invoke-WebRequest -Uri "https://ipv4.mydns.jp/login.html" -Headers @{ Authorization = "Basic $b64" }
+```
+
+IPv6 も使うなら同様に `https://ipv6.mydns.jp/login.html`。
+
+確認:
+
+```powershell
+nslookup 自分.mydns.jp
+```
+
+返ってきた A レコードが、今のグローバル IP と一致すれば成功です。
+
+### D. ルータのポート開放
+
+管理画面（多くは `192.168.0.1` や `192.168.1.1`）で **ポート変換 / 仮想サーバー**:
+
+| 外部ポート | プロトコル | 転送先 | 用途 |
+| --- | --- | --- | --- |
+| 443 | TCP | WMS を動かす PC の LAN IP : 443 | HTTPS |
+| 80 | TCP | 同じ PC : 80 | Let's Encrypt の証明書発行（HTTP-01）。発行後も更新に使う |
+
+- 転送先は PC の **プライベート IP**（`192.168.x.x`）。可能なら DHCP 予約で固定する
+- **5432（Postgres）と 8081（Node）は開放しない**
+- IPv6 で公開するならファイアウォールで 443 だけ許可
+
+Windows ファイアウォール（管理者 PowerShell）:
+
+```powershell
+New-NetFirewallRule -DisplayName "WMS HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
+New-NetFirewallRule -DisplayName "WMS HTTP-ACME" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
+```
+
+### E. HTTPS と Node への転送
+
+Cookie が `__Host-` のため **必ず https://自分のホスト名** で開きます。IP 直打ちや http ではログインが維持できません。
+
+Caddy を使う例（証明書を自動取得するので自宅向き）:
+
+1. [Caddy for Windows](https://caddyserver.com/docs/install#windows) を入れる
+2. `C:\apps\Caddyfile`:
+
+```
+自分.mydns.jp {
+  reverse_proxy 127.0.0.1:8081
+}
+```
+
+独自ドメインならその名前に置き換え。80 と 443 が届いていれば、初回起動で Let's Encrypt が発行されます。
+
+3. Node はこれまでどおり `npm run preview`（127.0.0.1:8081）
+4. Caddy も NSSM で常駐
+
+IIS を使う場合は、サイトのホスト名を MyDNS の名前にし、win-acme 等で証明書を付けたうえで、前述の ARR リバースプロキシを使います。
+
+### F. アプリ側の URL
+
+MyDNS の名前が `wms.example.mydns.jp` なら `config/server.json` の `betterAuthUrl` を `https://wms.example.mydns.jp` にします。変えたら `npm run build` と Node 再起動。ホスト名のスペルをアドレスバーと一字一句合わせます。
+
+### G. 外から見えるか確認
+
+1. **スマホは Wi-Fi を切って回線で**（自宅 LAN から自分のグローバル IP に戻ると、ルータによってはループできず失敗する）
+2. `https://自分.mydns.jp` が開く
+3. 鍵マークが付いている（証明書エラーならホスト名不一致か、発行失敗）
+
+証明書エラーのまま Google 認証には進めません。
+
+---
+
+## 自前ドメインで Google 認証する
+
+やりたいことは「Google アカウントで WMS に入る」です。経路は 2 種類あります。**X ログインはありません。**
+
+| | A. Grok 上（プレビュー含む） | B. 自宅 / 自前ドメイン |
+| --- | --- | --- |
+| ボタン | Google で続ける | 同じ |
+| 飛び先 | Grok ブローカー → Google | Google Cloud の OAuth（このサーバー直） |
+| 必要な秘密 | なし（Grok 側） | 自分が Console で発行 |
+| スイッチ | 何もしない（既定） | `VITE_GOOGLE_OAUTH=true` で **ビルド**し、実行時に `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
+
+### 1. Google Cloud で OAuth クライアントを作る
+
+1. [Google Cloud Console](https://console.cloud.google.com/) に、ログインに使う Google アカウントで入る
+2. 新しいプロジェクト（例: `wms-home`）
+3. **API とサービス → OAuth 同意画面**
+   - User Type: **外部**
+   - アプリ名: `WMS 資産管理システム`
+   - ユーザーサポートメール・デベロッパー連絡先: 自分の Gmail
+   - スコープ: あとで `email` / `profile` / `openid`（所定の「…userinfo.email」等）
+   - **テストユーザー**に、実際にログインする Gmail を追加  
+     公開ステータスを「本番」にしなくても、テストユーザーならすぐ使えます。少人数の自宅サーバーは **テストのまま**が安全です（本番公開は Google の審査対象）
+4. **API とサービス → 認証情報 → 認証情報を作成 → OAuth クライアント ID**
+   - アプリケーションの種類: **ウェブアプリケーション**
+   - 名前: `WMS Web`
+   - **承認済みの JavaScript 生成元**:
+     - `https://自分.mydns.jp`  
+     - 独自ドメインなら `https://wms.example.com` も（www を使うならそれも別行）
+   - **承認済みのリダイレクト URI**（**一字一句一致。末尾スラッシュなし**）:
+
+```
+https://自分.mydns.jp/api/auth/callback/google
+```
+
+Better Auth が Google を **直接**使うときの既定パスがこれです。ホスト名は `BETTER_AUTH_URL` と同じです。
+
+5. 発行された **クライアント ID** と **クライアント シークレット** を控える。シークレットはパスワードと同じ扱いで、Git に入れない。
+
+補足:
+
+- `http://` は Google がほぼ拒否します（localhost 以外）
+- IP アドレス (`https://203.0.113.10/...`) もウェブクライアントでは使えません。必ず MyDNS か独自ドメインの名前
+- テストモードのまま、許可してない Gmail で入ると Google が拒否します
+- クライアントを作り直すと ID が変わるので、アプリの環境変数も更新
+
+### 2. アプリに ID を渡してビルドする
+
+値はすべて `config/server.json` に書きます（実装済み）。
+
+```json
+{
+  "betterAuthUrl": "https://自分.mydns.jp",
+  "betterAuthSecret": "乱数",
+  "databaseUrl": "postgresql://wms:...@127.0.0.1:5432/wms",
+  "googleOAuth": true,
+  "googleClientId": "xxxxx.apps.googleusercontent.com",
+  "googleClientSecret": "GOCSPX-..."
+}
+```
+
+`googleOAuth` はビルド時にボタンの行き先へ効くので、保存したあと **必ず `npm run build`**。クライアント ID / シークレットだけ直したなら Node の再起動で足ります。
+
+このフラグを付けない（`googleOAuth: false` または省略）ビルドは、Grok プレビュー用のブローカー Google です。
+
+### 3. 動作確認の順番
+
+1. スマホ回線で `https://自分.mydns.jp` が証明書エラーなく開く
+2. ログイン → Google → アカウント選択 → 同意
+3. `https://自分.mydns.jp` に戻り、口座画面が出る
+4. サーバーを再起動してもログイン状態か、少なくともデータが Postgres に残っている
+
+Google のエラー画面が出たら:
+
+| Google の文言 | 原因 |
+| --- | --- |
+| redirect_uri_mismatch | Console の URI と実際のコールバックが違う。http/https、ホスト名、パス `/api/auth/callback/google` |
+| access_denied / 403 | テストユーザーにその Gmail が入っていない |
+| このアプリは Google で確認されていません | テストユーザー以外、または同意画面の公開範囲 |
+| Cookie / セッションが残らない | まだ http で開いている。MyDNS の https で開き直す |
+
+### 4. やってはいけないこと
+
+- クライアントシークレットを README のコピー先や Discord に貼る
+- 同意画面を「本番・外部全員」にして審査前に世界公開する（財務アプリ）
+- ルータで 5432 を開ける
+- Google ログインできたあと HTTP のブックマークで使い続ける（Cookie が付かない）
+
+MyDNS のホストが変わったら（ホスト名の変更）、Google Console の生成元とリダイレクト URI と `BETTER_AUTH_URL` の **3 点をセットで**直します。
+
+---
+
 ## 技術構成
 
 | 層 | 採用 |
@@ -431,7 +651,7 @@ $out = "C:\backup\wms-$stamp.dump"
 | UI | React 19, TanStack Router / Query, Tailwind CSS |
 | サーバー | Node.js, TanStack Start |
 | DB | PostgreSQL（本番は Neon。開発は埋め込み Postgres） |
-| 認証 | Better Auth（Google / X） |
+| 認証 | Better Auth（Google。自前サーバーは Google Cloud 直結可） |
 | グラフ | Recharts |
 | 配布 | PWA 対応の Web アプリ |
 

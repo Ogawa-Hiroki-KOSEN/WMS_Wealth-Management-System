@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { BrandLogo } from "@/components/brand-logo";
-import { GROK_PROVIDERS, authEnabled, signIn } from "@/lib/auth/client";
+import { authEnabled, resolveGoogleProviderId, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 export const Route = createFileRoute("/login")({ component: Login });
@@ -25,16 +25,13 @@ function Login() {
         </p>
         <div className="mt-8 space-y-2">
           {authEnabled ? (
-            GROK_PROVIDERS.map((p) => (
-              <button
-                key={p.providerId}
-                type="button"
-                onClick={() => signIn(p.providerId, { callbackURL: "/" })}
-                className="h-11 w-full rounded-md border border-border bg-elevated text-sm font-medium text-fg transition-colors hover:bg-bg"
-              >
-                {p.label} で続ける
-              </button>
-            ))
+            <button
+              type="button"
+              onClick={() => signIn(resolveGoogleProviderId(), { callbackURL: "/" })}
+              className="h-11 w-full rounded-md border border-border bg-elevated text-sm font-medium text-fg transition-colors hover:bg-bg"
+            >
+              Google で続ける
+            </button>
           ) : (
             <p className="text-sm text-muted">サインインは無効です。</p>
           )}
