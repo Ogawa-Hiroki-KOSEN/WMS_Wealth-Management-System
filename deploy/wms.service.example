@@ -1,0 +1,15 @@
+[Unit]
+Description=WMS production web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/wms
+ExecStart=/usr/bin/npm run preview
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

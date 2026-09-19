@@ -1,0 +1,4 @@
+# Replace the hostname with the MyDNS hostname registered for this server.
+wms.example.mydns.jp {
+    reverse_proxy 127.0.0.1:8081
+}

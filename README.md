@@ -256,6 +256,7 @@ postgresql://wms:パスワード@127.0.0.1:5432/wms
 | `authEnabled` | 任意。`false` で認証オフ。省略時は変えない |
 | `googleOAuth` | 任意。`true` で Google Cloud 直結（**ビルドし直す**） |
 | `googleClientId` / `googleClientSecret` | Google Cloud の値 |
+| `mydnsMasterId` / `mydnsPassword` | MyDNS の DDNS 更新用。`mydnsIpv6` を `true` にすると IPv6 も更新 |
 
 ファイルに書いた **非空の値は OS の環境変数より優先**されます。空文字は「未設定」で、そのときだけ環境変数を使います（Grok 上のデプロイ注入用）。
 
@@ -488,6 +489,24 @@ Invoke-WebRequest -Uri "https://ipv4.mydns.jp/login.html" -Headers @{ Authorizat
 ```
 
 IPv6 も使うなら同様に `https://ipv6.mydns.jp/login.html`。
+
+このリポジトリには同じ処理を Node.js から実行するコマンドもあります。`config/server.json` に次を追加し、資格情報を Git に登録しないでください。
+
+```json
+{
+  "mydnsMasterId": "発行されたMasterID",
+  "mydnsPassword": "MyDNSのパスワード",
+  "mydnsIpv6": false
+}
+```
+
+```powershell
+cd C:\apps\wms
+npm run mydns:update -- --check
+npm run mydns:update
+```
+
+Windows ではタスクスケジューラで `npm run mydns:update` を 10 分ごとに実行します。Linux では `deploy/wms-mydns-update.service.example` と `deploy/wms-mydns-update.timer.example` を systemd に登録できます。ルータが MyDNS 更新に対応している場合は、ルータ側で更新し、このコマンドとの二重登録は避けてください。
 
 確認:
 

@@ -14,6 +14,8 @@ const ENV_MAP = {
   betterAuthSecret: "BETTER_AUTH_SECRET",
   googleClientId: "GOOGLE_CLIENT_ID",
   googleClientSecret: "GOOGLE_CLIENT_SECRET",
+  mydnsMasterId: "MYDNS_MASTER_ID",
+  mydnsPassword: "MYDNS_PASSWORD",
 };
 
 /** @param {string} text */

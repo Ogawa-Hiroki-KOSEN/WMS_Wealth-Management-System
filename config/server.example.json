@@ -5,5 +5,8 @@
   "authEnabled": true,
   "googleOAuth": true,
   "googleClientId": "xxxxx.apps.googleusercontent.com",
-  "googleClientSecret": "GOCSPX-..."
+  "googleClientSecret": "GOCSPX-...",
+  "mydnsMasterId": "YOUR_MASTER_ID",
+  "mydnsPassword": "MyDNSのパスワード",
+  "mydnsIpv6": false
 }
