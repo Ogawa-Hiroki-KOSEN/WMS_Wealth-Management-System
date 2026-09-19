@@ -182,6 +182,221 @@ npm run build
 
 Google / X ログインは、Grok 上ではブローカー経由で動きます。自宅ドメインで Google を使う手順は「自宅 PC + MyDNS」と「自前ドメインで Google 認証」にあります。
 
+### 自宅 Windows + MyDNS の最短手順
+
+以下は、`wms.example.mydns.jp` を例にした最初から最後までの手順です。`wms.example.mydns.jp` は自分が MyDNS に登録した実際のホスト名に読み替えてください。迷った場合は **Caddy 構成**を使うのが簡単です。
+
+#### 完成する構成
+
+```text
+インターネット
+  -> https://wms.example.mydns.jp:443
+  -> 自宅ルータのポート転送
+  -> Windows の Caddy :443 (HTTPS)
+  -> Windows の WMS :8081 (HTTP / localhost のみ)
+  -> Windows の PostgreSQL :5432 (localhost のみ)
+```
+
+#### 作業の順番
+
+1. Windows に Node.js 22 LTS、PostgreSQL 16、Git をインストールする
+2. PC のスリープを無効にし、ルータで PC の LAN IP を DHCP 予約する
+3. MyDNS でホスト名を登録し、現在のグローバル IP を更新する
+4. PostgreSQL に `wms` データベースを作る
+5. WMS を `C:\apps\wms` に置き、`npm install` する
+6. `config\server.json` を作り、公開 URL・DB・認証・MyDNS を設定する
+7. `npm run build` でビルドとデータベースマイグレーションを実行する
+8. `npm run preview` で `127.0.0.1:8081` に起動し、ローカル確認する
+9. MyDNS の更新をタスクスケジューラで 10 分ごとに実行する
+10. Caddy を入れ、`wms.example.mydns.jp` から `127.0.0.1:8081` に転送する
+11. ルータで外部 80 / 443 を Windows PC に転送する
+12. WMS と Caddy を Windows 起動時に自動起動する
+13. スマホのモバイル回線から HTTPS とログインを確認する
+
+**外部公開するポートは 80 と 443 だけ**です。5432（PostgreSQL）と 8081（WMS）はルータから転送しません。
+
+#### まず公開できる回線か確認する
+
+次のどれかに該当する場合、通常の IPv4 ポート開放では公開できません。
+
+- ルータの WAN IPv4 と、`https://ifconfig.me` に表示される IPv4 が違う
+- WAN IPv4 が `100.64.0.0` ～ `100.127.255.255` である（CGNAT）
+- ISP が外部からの 80 / 443 接続を遮断している
+
+この場合は、MyDNS の IPv6（AAAA）公開、VPN、または Cloudflare Tunnel などを利用してください。CGNAT のままルータ設定だけを変更しても外部から到達しません。
+
+#### MyDNS の初期設定
+
+1. [MyDNS.jp](https://www.mydns.jp/) でアカウントを作成する
+2. MyDNS の管理画面で `wms.example.mydns.jp` のようなホスト名を登録する
+3. ルータが MyDNS の DDNS に対応している場合は、ルータの DDNS 設定に Master ID とパスワードを登録する
+4. ルータが対応していない場合は、この README の「MyDNS の更新」をタスクスケジューラに登録する
+5. PowerShell で名前解決を確認する
+
+```powershell
+nslookup wms.example.mydns.jp
+```
+
+表示された A レコードが現在のグローバル IPv4 と一致することを確認します。ルータと WMS の両方で更新すると二重通知になるため、DDNS 更新方法はどちらか一つにします。
+
+#### PostgreSQL の作成
+
+管理者権限ではない通常の PowerShell で、PostgreSQL の `psql.exe` を実行します。インストール先が違う場合はパスを変更してください。
+
+```powershell
+& "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres
+```
+
+```sql
+CREATE USER wms WITH PASSWORD '強いパスワードに置き換える';
+CREATE DATABASE wms OWNER wms ENCODING 'UTF8';
+GRANT ALL PRIVILEGES ON DATABASE wms TO wms;
+\q
+```
+
+PostgreSQL の 5432 番ポートをインターネットに公開しないでください。
+
+#### WMS の配置と設定
+
+```powershell
+New-Item -ItemType Directory -Force C:\apps\wms
+Set-Location C:\apps\wms
+# リポジトリのファイル一式をここへコピーする
+npm install
+Copy-Item config\server.example.json config\server.json
+notepad config\server.json
+```
+
+`config\server.json` は次のように設定します。値はすべて実際のものに置き換えてください。
+
+```json
+{
+  "databaseUrl": "postgresql://wms:パスワード@127.0.0.1:5432/wms",
+  "betterAuthUrl": "https://wms.example.mydns.jp",
+  "betterAuthSecret": "32文字以上のランダムな文字列",
+  "authEnabled": true,
+  "googleOAuth": true,
+  "googleClientId": "xxxxx.apps.googleusercontent.com",
+  "googleClientSecret": "GOCSPX-...",
+  "mydnsMasterId": "MyDNSのMasterID",
+  "mydnsPassword": "MyDNSのパスワード",
+  "mydnsIpv6": false
+}
+```
+
+DB パスワードに `@`、`#`、`/` などを使う場合は、接続 URL 用に URL エンコードしてください。`betterAuthSecret` は一度決めたら変更しません。`config\server.json` は `.gitignore` 対象ですが、バックアップや共有時にも秘密情報を漏らさないでください。
+
+乱数は PowerShell で作れます。
+
+```powershell
+[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+#### ビルドとローカル確認
+
+```powershell
+Set-Location C:\apps\wms
+npm run build
+npm run preview
+```
+
+別の PowerShell で `http://127.0.0.1:8081` を開き、画面が表示されることを確認します。これはローカル確認用です。外部公開 URL ではログインできないため、最終確認は HTTPS の URL で行います。
+
+#### MyDNS の更新
+
+ルータが MyDNS 更新に対応していない場合だけ、次を実行します。
+
+```powershell
+Set-Location C:\apps\wms
+npm run mydns:update -- --check
+npm run mydns:update
+```
+
+`--check` は資格情報の存在だけを確認し、MyDNS へ接続しません。更新に成功したら `nslookup wms.example.mydns.jp` で A レコードを確認します。
+
+Windows タスクスケジューラでは、**タスクの作成**から次のように登録します。
+
+- 名前: `WMS MyDNS Update`
+- トリガー: コンピューター起動時、または 10 分ごとの繰り返し
+- 操作: `C:\Program Files\nodejs\npm.cmd`
+- 引数: `run mydns:update`
+- 開始場所: `C:\apps\wms`
+- ユーザー: Windows 起動時にも実行できる管理用ユーザー
+- 「ユーザーがログオンしているかどうかにかかわらず実行する」を選択
+
+#### Caddy の HTTPS 設定
+
+1. [Caddy for Windows](https://caddyserver.com/docs/install#windows) をダウンロードする
+2. `C:\apps\Caddyfile` を作成する
+
+```text
+wms.example.mydns.jp {
+    reverse_proxy 127.0.0.1:8081
+}
+```
+
+3. ルータで外部 TCP 80 と 443 を Windows PC の LAN IP に転送する
+4. Windows ファイアウォールで TCP 80 と 443 を許可する
+5. 管理者 PowerShell で Caddy を起動して証明書取得を確認する
+
+```powershell
+cd C:\apps\Caddy
+\.\caddy.exe run --config C:\apps\Caddyfile
+```
+
+Caddy は 80 番で証明書を取得し、443 番で HTTPS を提供します。初回取得中は 80 / 443 を別のアプリが使用していないことを確認してください。証明書取得後も Caddy は自動更新のため常駐させます。
+
+#### ポート転送とファイアウォール
+
+ルータの「ポート開放」「ポート変換」「仮想サーバー」などの画面で、次を登録します。
+
+| 外部ポート | プロトコル | 転送先 | 用途 |
+| --- | --- | --- | --- |
+| 80 | TCP | Windows PC の LAN IP:80 | Caddy の証明書取得・更新 |
+| 443 | TCP | Windows PC の LAN IP:443 | HTTPS |
+
+管理者 PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "WMS HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
+New-NetFirewallRule -DisplayName "WMS HTTP ACME" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
+```
+
+5432 と 8081 のルータ転送やファイアウォール許可は追加しません。
+
+#### WMS と Caddy の自動起動
+
+WMS は NSSM などで Windows サービスにします。`C:\apps\wms\start-prod.cmd`:
+
+```bat
+@echo off
+cd /d C:\apps\wms
+call "C:\Program Files\nodejs\npm.cmd" run preview
+```
+
+管理者 PowerShell:
+
+```powershell
+nssm install WMS C:\apps\wms\start-prod.cmd
+nssm set WMS AppDirectory C:\apps\wms
+nssm set WMS Start SERVICE_AUTO_START
+nssm start WMS
+```
+
+Caddy も NSSM で `C:\apps\Caddy\caddy.exe run --config C:\apps\Caddyfile` をサービス登録します。WMS サービスを先に起動し、Caddy サービスを後に起動すると確認しやすくなります。
+
+#### 外部からの最終確認
+
+自宅 Wi-Fi を切ったスマートフォンで、次を順に確認します。
+
+1. `https://wms.example.mydns.jp` が開く
+2. ブラウザに証明書エラーがない
+3. Google ログイン後に WMS の画面へ戻る
+4. 口座を一つ登録し、別の端末でも同じデータが見える
+5. Windows を再起動しても URL とログインが動く
+
+自宅 Wi-Fi 内からだけ確認すると、ルータの NAT ループバック非対応で誤判定することがあります。必ずモバイル回線から確認してください。
+
 ### 1. 前提ソフト
 
 | ソフト | 目安 | メモ |
@@ -244,7 +459,10 @@ postgresql://wms:パスワード@127.0.0.1:5432/wms
   "authEnabled": true,
   "googleOAuth": true,
   "googleClientId": "xxxxx.apps.googleusercontent.com",
-  "googleClientSecret": "GOCSPX-..."
+  "googleClientSecret": "GOCSPX-...",
+  "mydnsMasterId": "MyDNSのMasterID",
+  "mydnsPassword": "MyDNSのパスワード",
+  "mydnsIpv6": false
 }
 ```
 
