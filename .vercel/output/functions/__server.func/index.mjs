@@ -12,8 +12,8 @@ var install_page_default = "<!DOCTYPE html>\n<html lang=\"en\" class=\"device-de
 //#endregion
 //#region \0virtual:grok-og-identity
 var grokOgIdentity = { "site": {
-	"title": "所持金",
-	"color": "2C463F"
+	"title": "WMS 資産管理システム",
+	"color": "111111"
 } };
 //#endregion
 //#region scripts/grok-pwa-shared.mjs
@@ -457,11 +457,11 @@ var findRouteRules = /* @__PURE__ */ (() => {
 		return r;
 	};
 })();
-var _lazy_IO091Z = defineLazyEventHandler(() => import("./_chunks/ssr-renderer.mjs"));
+var _lazy_TuXiQm = defineLazyEventHandler(() => import("./_chunks/ssr-renderer.mjs"));
 var findRoute = /* @__PURE__ */ (() => {
 	const data = {
 		route: "/**",
-		handler: _lazy_IO091Z
+		handler: _lazy_TuXiQm
 	};
 	return ((_m, p) => {
 		return {

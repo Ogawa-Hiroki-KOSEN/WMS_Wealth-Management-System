@@ -117,7 +117,7 @@ var HEADERS = { TSS_SHELL: "X-TSS_SHELL" };
 * the dev styles URL for route-scoped CSS collection.
 */
 async function getStartManifest(matchedRoutes) {
-	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-z4fHlNP3.mjs");
+	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-B3UFn0bn.mjs");
 	const startManifest = tsrStartManifest();
 	let routes = startManifest.routes;
 	routes[rootRouteId];
@@ -139,47 +139,47 @@ async function getStartManifest(matchedRoutes) {
 var manifest = {
 	"14ce5db54ba5eae3e0a412383c6e2d393af5962ac46b4404bc785e888a1dfa34": {
 		functionName: "updateAccount_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"163392b543e5476c7d0ee6063cd3e91ab3bb77ec97e02f3bb12cde8ae1ac811d": {
 		functionName: "getReport_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"2c4985e96c199268f7f639534cb5e8e31d6b19d43286bf77416413db60ffde26": {
 		functionName: "fetchSessionUser_createServerFn_handler",
-		importer: () => import("../__root-nSimTkdl.mjs")
+		importer: () => import("../__root-CKPD2O5Z.mjs")
 	},
 	"41e22866a98b8d50007ab710ed7fc2e9e011d334a9dc708655ada7929cab009f": {
 		functionName: "listTransactions_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"61cc5f90607f04d0e1abceecc4870500af80cf2cfb1c8eb98f94733d82644dd5": {
 		functionName: "getMonthSummary_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"7df7af4222db6fc44b85bd4aadb89c0a7403a7d0faaa4d000ee98ef41367fd07": {
 		functionName: "listAccounts_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"82c8247edf704a0ca782e8c4985bd5827ade7929fe9f00b4bd146356c40fa723": {
 		functionName: "deleteTransaction_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"8fa8fddf0686804dc8010cca68cb935ca426ea0f8b19c8f96f6763021f7f93ee": {
 		functionName: "listCategories_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"c139b97d19d7718291ce4bff8392c4ca26f27f0911d786d0c0719323d9006e5d": {
 		functionName: "createAccount_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"e26473c5237050adff2eb3c0c56337aeb08dd7cf514f430376c3ba2d6246c3d0": {
 		functionName: "addTransaction_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	},
 	"e8f65d557cadf3e1775ba5df0fcab8bdb2b1b43fc9923f1252f6bc4913f70637": {
 		functionName: "bootstrapFinance_createServerFn_handler",
-		importer: () => import("./finance-Dmat4HMx.mjs")
+		importer: () => import("./finance-DHbOrKL9.mjs")
 	}
 };
 async function getServerFnById(id, access) {
@@ -1449,7 +1449,7 @@ var getBaseManifest = getProdBaseManifest;
 var createEarlyHintsForRequest = createEarlyHintsCollector;
 async function loadEntries() {
 	const [routerEntry, startEntry, pluginAdapters] = await Promise.all([
-		import("./router-BslbQkPD.mjs").then((n) => n.t),
+		import("./router-DQrnO_eT.mjs").then((n) => n.t),
 		import("./start-5Z2QO8AU.mjs"),
 		import("./empty-plugin-adapters-D9UWiqvJ.mjs")
 	]);
